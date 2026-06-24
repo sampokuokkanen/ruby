@@ -1,0 +1,13 @@
+prelude: |
+  sym1   = :a
+  sym8   = :abcdefgh
+  sym32  = ("a" * 32).to_sym
+  sym256 = ("a" * 256).to_sym
+  GC.disable
+benchmark:
+  symbol_length-1:    sym1.length
+  symbol_length-8:    sym8.length
+  symbol_length-32:   sym32.length
+  symbol_length-256:  sym256.length
+  symbol_size-8:      sym8.size
+loop_count: 20000000
