@@ -29,6 +29,17 @@ class Symbol
   end
 
   # call-seq:
+  #   length -> integer
+  #
+  # Equivalent to <tt>self.to_s.length</tt>; see String#length.
+  def length
+    Primitive.attr! :leaf
+    Primitive.cexpr! 'rb_str_length(rb_sym2str(self))'
+  end
+
+  alias size length
+
+  # call-seq:
   #   to_sym -> self
   #
   # Returns +self+.

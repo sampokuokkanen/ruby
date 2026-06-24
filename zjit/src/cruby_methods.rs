@@ -291,6 +291,8 @@ pub fn init() -> Annotations {
     annotate_builtin!(rb_mKernel, "frozen?", types::BoolExact);
     annotate_builtin!(rb_cSymbol, "name", types::StringExact);
     annotate_builtin!(rb_cSymbol, "to_s", types::StringExact);
+    annotate_builtin!(rb_cSymbol, "length", types::Fixnum);
+    annotate_builtin!(rb_cSymbol, "size", types::Fixnum);
 
     // Array iteration builtins (used in with_jit Array#each, map, select, find)
     builtin_funcs.insert(rb_jit_fixnum_inc as *mut c_void, FnProperties { inline: inline_fixnum_inc, return_type: types::Fixnum, ..Default::default() });

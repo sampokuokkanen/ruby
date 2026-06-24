@@ -12627,18 +12627,6 @@ sym_aref(int argc, VALUE *argv, VALUE sym)
     return rb_str_aref_m(argc, argv, rb_sym2str(sym));
 }
 
-/*
- *  call-seq:
- *    length -> integer
- *
- *  Equivalent to <tt>self.to_s.length</tt>; see String#length.
- */
-
-static VALUE
-sym_length(VALUE sym)
-{
-    return rb_str_length(rb_sym2str(sym));
-}
 
 /*
  *  call-seq:
@@ -13090,8 +13078,6 @@ Init_String(void)
 
     rb_define_method(rb_cSymbol, "[]", sym_aref, -1);
     rb_define_method(rb_cSymbol, "slice", sym_aref, -1);
-    rb_define_method(rb_cSymbol, "length", sym_length, 0);
-    rb_define_method(rb_cSymbol, "size", sym_length, 0);
     rb_define_method(rb_cSymbol, "empty?", sym_empty, 0);
     rb_define_method(rb_cSymbol, "match", sym_match_m, -1);
     rb_define_method(rb_cSymbol, "match?", sym_match_m_p, -1);
