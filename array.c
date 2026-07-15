@@ -23,6 +23,7 @@
 #include "internal/object.h"
 #include "internal/proc.h"
 #include "internal/rational.h"
+#include "internal/set_table.h"
 #include "internal/vm.h"
 #include "probes.h"
 #include "ruby/encoding.h"
@@ -5651,6 +5652,69 @@ ary_make_hash_by(VALUE ary)
     return ary_add_hash_by(hash, ary);
 }
 
+static int
+ary_uniq_set_cmp(VALUE a, VALUE b)
+{
+    if (a == b) return 0;
+    if (FLONUM_P(a) && FLONUM_P(b)) {
+        return rb_float_value(a) != rb_float_value(b);
+    }
+    if (!SPECIAL_CONST_P(a) && !SPECIAL_CONST_P(b) &&
+        RB_TYPE_P(a, T_STRING) && RB_TYPE_P(b, T_STRING)) {
+        return rb_str_hash_cmp(a, b);
+    }
+    return 1; /* other admitted types are interned or immediate: eql? is identity */
+}
+
+static const struct st_hash_type ary_uniq_set_hash_type = {
+    ary_uniq_set_cmp,
+    rb_any_hash,
+};
+
+/* Fast path is usable only when hash and eql? run no Ruby code, so no GC or
+ * raise can happen while the table holds keys: special constants, plain
+ * Strings, and (interned) Symbols. */
+static bool
+ary_uniq_set_usable_p(VALUE ary)
+{
+    long i, len = RARRAY_LEN(ary);
+
+    for (i = 0; i < len; i++) {
+        VALUE elt = RARRAY_AREF(ary, i);
+        if (SPECIAL_CONST_P(elt)) continue;
+        if (RB_TYPE_P(elt, T_STRING) && RBASIC(elt)->klass == rb_cString) continue;
+        if (RB_TYPE_P(elt, T_SYMBOL)) continue;
+        return false;
+    }
+    return true;
+}
+
+static int
+ary_uniq_push_i(st_data_t key, st_data_t arg)
+{
+    rb_ary_push((VALUE)arg, (VALUE)key);
+    return ST_CONTINUE;
+}
+
+static VALUE
+ary_uniq_set(VALUE ary)
+{
+    long i, len = RARRAY_LEN(ary);
+    set_table table;
+    VALUE uniq = rb_ary_new_capa(len);
+
+    /* preallocated for len, so nothing allocates while the table holds keys */
+    set_init_table_with_size(&table, &ary_uniq_set_hash_type, len);
+    for (i = 0; i < len; i++) {
+        VALUE elt = RARRAY_AREF(ary, i);
+        set_insert(&table, (st_data_t)elt);
+    }
+    set_table_foreach(&table, ary_uniq_push_i, (st_data_t)uniq);
+    set_free_embedded_table(&table);
+    if (RARRAY_LEN(uniq) < len) ary_resize_capa(uniq, RARRAY_LEN(uniq));
+    return uniq;
+}
+
 /*
  *  call-seq:
  *    self - other_array -> new_array
@@ -6444,6 +6508,13 @@ rb_ary_uniq_bang(VALUE ary)
     rb_ary_modify_check(ary);
     if (RARRAY_LEN(ary) <= 1)
         return Qnil;
+    if (!rb_block_given_p() && ary_uniq_set_usable_p(ary)) {
+        VALUE uniq = ary_uniq_set(ary);
+        if (RARRAY_LEN(uniq) == RARRAY_LEN(ary))
+            return Qnil;
+        rb_ary_replace(ary, uniq);
+        return ary;
+    }
     if (rb_block_given_p())
         hash = ary_make_hash_by(ary);
     else
@@ -6497,12 +6568,14 @@ rb_ary_uniq(VALUE ary)
     VALUE hash, uniq;
 
     if (RARRAY_LEN(ary) <= 1) {
-        hash = 0;
         uniq = rb_ary_dup(ary);
     }
     else if (rb_block_given_p()) {
         hash = ary_make_hash_by(ary);
         uniq = rb_hash_values(hash);
+    }
+    else if (ary_uniq_set_usable_p(ary)) {
+        uniq = ary_uniq_set(ary);
     }
     else {
         hash = ary_make_hash(ary);

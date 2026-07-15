@@ -1,0 +1,16 @@
+prelude: |
+  int_dup    = (0...10000).map { |i| i % 100 }
+  int_uniq   = (0...10000).to_a
+  str_dup    = (0...10000).map { |i| "s#{i % 100}" }
+  sym_dup    = (0...10000).map { |i| "s#{i % 100}".to_sym }
+  obj_dup    = (0...10000).map { |i| [i % 100] }
+
+benchmark:
+  int_dup:  int_dup.uniq
+  int_uniq: int_uniq.uniq
+  str_dup:  str_dup.uniq
+  sym_dup:  sym_dup.uniq
+  obj_dup:  obj_dup.uniq
+  int_dup_bang: int_dup.dup.uniq!
+  str_dup_bang: str_dup.dup.uniq!
+loop_count: 1000
